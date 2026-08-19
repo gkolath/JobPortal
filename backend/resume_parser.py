@@ -22,6 +22,8 @@ SKILL_DICTIONARY = [
     "change management", "executive support", "business development", "partnerships",
     "venture capital", "private equity", "consulting", "mba", "financial modeling",
     "budgeting", "forecasting", "okrs", "kpi", "people management", "hiring",
+    "human resources", "hr", "recruitment", "talent acquisition", "employee relations",
+    "payroll", "onboarding", "workforce planning", "organizational development",
 ]
 
 TITLE_KEYWORDS = [
@@ -69,12 +71,16 @@ def _skill_in_text(skill: str, text: str) -> bool:
 
 
 def extract_skills(text: str) -> List[str]:
+    from search_query import FALSE_POSITIVE_SKILLS, filter_skills
+
     lower = text.lower()
     found = []
     for skill in sorted(SKILL_DICTIONARY, key=len, reverse=True):
+        if skill in FALSE_POSITIVE_SKILLS:
+            continue
         if _skill_in_text(skill, lower):
             found.append(skill)
-    return sorted(set(found))
+    return sorted(set(filter_skills(found)))
 
 
 def _is_junk_title(title: str) -> bool:
@@ -89,20 +95,25 @@ def extract_titles(text: str) -> List[str]:
 
     for line in lines[:12]:
         clean = line.strip("•|- ")
-        if 4 < len(clean) < 70 and not re.search(r"@|https?://|linkedin", clean, re.I):
+        if re.search(r"@|https?://|www\.|linkedin", clean, re.I):
+            continue
+        if len(clean) > 70 or "years of" in clean.lower() or "visionary" in clean.lower():
+            continue
+        if 4 < len(clean) < 70:
             lower = clean.lower()
             if any(kw in lower for kw in TITLE_KEYWORDS):
                 titles.append(clean.title() if clean.isupper() else clean)
 
     for line in lines[:8]:
-        if "/" in line and len(line) < 70:
+        if "/" in line and len(line) < 70 and not re.search(r"linkedin|https?://", line, re.I):
             titles.append(line.strip())
 
     if not titles:
         for line in lines[:15]:
             if any(kw in line.lower() for kw in TITLE_KEYWORDS) and len(line) < 70:
-                titles.append(line[:70])
-                break
+                if not re.search(r"linkedin|https?://", line, re.I):
+                    titles.append(line[:70])
+                    break
 
     deduped = []
     for t in titles:

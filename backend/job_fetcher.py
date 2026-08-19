@@ -99,20 +99,6 @@ async def fetch_jsearch_jobs(keywords: str, location: str, max_pages: int = 2) -
 
 
 def build_search_keywords(skills: List[str], titles: List[str], extra: str = "") -> str:
-    junk = ["managing", "partnered", "cross-functional", "multi-venture", "alignment"]
-    primary_title = ""
-    for t in titles:
-        if not any(j in t.lower() for j in junk):
-            primary_title = t.split("/")[0].strip()
-            break
-    if not primary_title and titles:
-        primary_title = titles[0].split("/")[0].strip()
+    from search_query import primary_role_query
 
-    parts = []
-    if primary_title:
-        parts.append(primary_title)
-    if skills:
-        parts.extend(skills[:5])
-    if extra:
-        parts.append(extra)
-    return " ".join(parts) if parts else "software engineer"
+    return primary_role_query(titles, skills, extra)

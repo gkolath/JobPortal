@@ -9,8 +9,16 @@ from job_fetcher import build_search_keywords, fetch_adzuna_jobs, fetch_jsearch_
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from matcher import compute_score
 from models import Job, JobMatch, Resume, SearchProfile, User
+from search_query import filter_skills
 
 logger = logging.getLogger(__name__)
+
+
+def clear_all_jobs(db: Session) -> None:
+    """Remove stale listings so a new resume doesn't keep old tech jobs."""
+    db.query(JobMatch).delete()
+    db.query(Job).delete()
+    db.commit()
 
 
 def _get_or_create_search_profile(db: Session, user: User) -> SearchProfile:
@@ -49,7 +57,7 @@ def match_jobs_for_user(db: Session, user: User) -> int:
     if not resume:
         return 0
 
-    skills = json.loads(resume.skills_json or "[]")
+    skills = filter_skills(json.loads(resume.skills_json or "[]"))
     titles = json.loads(resume.titles_json or "[]")
     jobs = db.query(Job).all()
     count = 0
@@ -80,10 +88,13 @@ def match_jobs_for_user(db: Session, user: User) -> int:
 async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     resume = db.query(Resume).filter(Resume.user_id == user.id).first()
     profile = _get_or_create_search_profile(db, user)
-    skills = json.loads(resume.skills_json) if resume else []
+    skills = filter_skills(json.loads(resume.skills_json) if resume else [])
     titles = json.loads(resume.titles_json) if resume else []
     keywords = build_search_keywords(skills, titles, profile.extra_keywords)
     locations = parse_locations(profile.locations_json, profile.location, profile.country)
+    logger.info("Job search keywords for user %s: %s", user.id, keywords)
+
+    clear_all_jobs(db)
 
     all_fetched = []
     for loc in locations:
@@ -113,17 +124,21 @@ async def refresh_all_jobs(db: Session) -> tuple:
     for user in users:
         resume = db.query(Resume).filter(Resume.user_id == user.id).first()
         profile = _get_or_create_search_profile(db, user)
-        skills = json.loads(resume.skills_json) if resume else []
+        skills = filter_skills(json.loads(resume.skills_json) if resume else [])
         titles = json.loads(resume.titles_json) if resume else []
         keywords = build_search_keywords(skills, titles, profile.extra_keywords)
         locations = parse_locations(
             profile.locations_json, profile.location, profile.country
         )
+        logger.info("Job search keywords for user %s: %s", user.id, keywords)
 
         for loc in locations:
             adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
             jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
             all_fetched.extend(adzuna + jsearch)
+
+    # Replace the board so old software listings don't stick around
+    clear_all_jobs(db)
 
     seen = set()
     unique = []

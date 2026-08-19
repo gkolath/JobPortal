@@ -58,6 +58,28 @@ def seniority_score(years: int, job_title: str, description: str) -> float:
     return max(0.0, 100.0 - diff * 25)
 
 
+TECH_JOB_MARKERS = (
+    "software engineer", "software developer", "full stack", "fullstack",
+    "backend", "frontend", "devops", "sde", "java developer", "python developer",
+    "react developer", "data engineer", "ml engineer",
+)
+
+OPS_HR_MARKERS = (
+    "chief of staff", "operations", "human resources", " hr ", "people ops",
+    "strategy", "program manager", "project manager", "business partner",
+)
+
+
+def _resume_is_ops_hr(skills: List[str], titles: List[str]) -> bool:
+    hay = " ".join(titles + skills).lower()
+    return any(m in hay for m in OPS_HR_MARKERS)
+
+
+def _job_is_pure_tech(job_title: str) -> bool:
+    lower = job_title.lower()
+    return any(m in lower for m in TECH_JOB_MARKERS)
+
+
 def compute_score(
     resume_skills: List[str],
     resume_titles: List[str],
@@ -69,6 +91,11 @@ def compute_score(
     s = skill_score(resume_skills, description, job_title)
     e = seniority_score(years_experience, job_title, description)
     score = 0.35 * t + 0.45 * s + 0.20 * e
+
+    # Demote pure software roles when resume is HR/ops/strategy
+    if _resume_is_ops_hr(resume_skills, resume_titles) and _job_is_pure_tech(job_title):
+        score *= 0.25
+
     score = round(score, 1)
 
     if score >= 75:
