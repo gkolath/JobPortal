@@ -1,6 +1,7 @@
 import { useState } from "react";
 import MatchBadge from "./MatchBadge";
 import { api, Job } from "../lib/api";
+import { stripHtml } from "../lib/text";
 
 interface JobCardProps {
   job: Job;
@@ -64,9 +65,8 @@ export default function JobCard({ job, onUpdate, readOnly = false }: JobCardProp
       </div>
 
       <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600">
-        {job.description}
+        {stripHtml(job.description || "", 500)}
       </p>
-
       {job.fit_reason && (
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <span className="font-medium text-slate-800">Why this match: </span>

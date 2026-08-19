@@ -34,6 +34,37 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
     _migrate()
+    _scrub_html_descriptions()
+
+
+def _scrub_html_descriptions() -> None:
+    """One-time cleanup of HTML left in stored job descriptions."""
+    inspector = inspect(engine)
+    if "jobs" not in inspector.get_table_names():
+        return
+    from text_utils import html_to_text
+    from models import Job
+
+    db = SessionLocal()
+    try:
+        dirty = (
+            db.query(Job)
+            .filter(Job.description.like("%<%"))
+            .limit(500)
+            .all()
+        )
+        if not dirty:
+            return
+        for job in dirty:
+            job.description = html_to_text(job.description or "")
+            job.title = html_to_text(job.title or "")
+            job.company = html_to_text(job.company or "")
+            job.location = html_to_text(job.location or "")
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _migrate():
