@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed two user accounts for the job portal."""
+"""Seed user accounts for the job portal."""
 
 import os
 import sys
@@ -20,6 +20,7 @@ def main():
     users = [
         {"name": "George", "email": "gkolath85@hotmail.com", "password": "changeme123"},
         {"name": "Friend", "email": "friend@example.com", "password": "changeme123"},
+        {"name": "Shameela", "email": "emailshameela@gmail.com", "password": "changeme123"},
     ]
 
     for u in users:

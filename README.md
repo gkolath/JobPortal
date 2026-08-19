@@ -42,6 +42,7 @@ chmod +x scripts/start.sh
 Default logins (change after first use):
 - `gkolath85@hotmail.com` / `changeme123`
 - `friend@example.com` / `changeme123`
+- `emailshameela@gmail.com` / `changeme123`
 
 ## Environment variables
 
