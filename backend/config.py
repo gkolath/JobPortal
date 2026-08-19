@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     default_location: str = "Bangalore"
     max_users: int = 2
+    min_job_score: float = 40.0
+
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
 
     uploads_dir: Path = ROOT_DIR / "uploads"
     static_dir: Path = ROOT_DIR / "frontend" / "dist"

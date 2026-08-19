@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from job_fetcher import build_search_keywords, fetch_adzuna_jobs, fetch_jsearch_jobs
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
+from config import settings
 from matcher import compute_score
 from models import Job, JobMatch, Resume, SearchProfile, User
 from search_query import filter_skills
@@ -66,6 +67,16 @@ def match_jobs_for_user(db: Session, user: User) -> int:
         score, label = compute_score(
             skills, titles, resume.years_experience, job.title, job.description
         )
+        if score < settings.min_job_score and label == "weak":
+            # Drop very weak matches so the board stays relevant
+            existing = (
+                db.query(JobMatch)
+                .filter(JobMatch.user_id == user.id, JobMatch.job_id == job.id)
+                .first()
+            )
+            if existing and not existing.saved and not existing.applied:
+                db.delete(existing)
+            continue
         match = (
             db.query(JobMatch)
             .filter(JobMatch.user_id == user.id, JobMatch.job_id == job.id)
@@ -90,7 +101,13 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     profile = _get_or_create_search_profile(db, user)
     skills = filter_skills(json.loads(resume.skills_json) if resume else [])
     titles = json.loads(resume.titles_json) if resume else []
-    keywords = build_search_keywords(skills, titles, profile.extra_keywords)
+    extra = profile.extra_keywords
+    if resume and getattr(resume, "search_query", ""):
+        keywords = resume.search_query
+        if extra:
+            keywords = f"{keywords} {extra}".strip()
+    else:
+        keywords = build_search_keywords(skills, titles, extra)
     locations = parse_locations(profile.locations_json, profile.location, profile.country)
     logger.info("Job search keywords for user %s: %s", user.id, keywords)
 
@@ -126,7 +143,13 @@ async def refresh_all_jobs(db: Session) -> tuple:
         profile = _get_or_create_search_profile(db, user)
         skills = filter_skills(json.loads(resume.skills_json) if resume else [])
         titles = json.loads(resume.titles_json) if resume else []
-        keywords = build_search_keywords(skills, titles, profile.extra_keywords)
+        extra = profile.extra_keywords
+        if resume and getattr(resume, "search_query", ""):
+            keywords = resume.search_query
+            if extra:
+                keywords = f"{keywords} {extra}".strip()
+        else:
+            keywords = build_search_keywords(skills, titles, extra)
         locations = parse_locations(
             profile.locations_json, profile.location, profile.country
         )

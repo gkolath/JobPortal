@@ -36,6 +36,7 @@ class ResumeOut(BaseModel):
     titles: List[str]
     years_experience: int
     uploaded_at: datetime
+    search_query: str = ""
 
     class Config:
         from_attributes = True

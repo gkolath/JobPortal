@@ -90,8 +90,13 @@ export default function ProfilePage() {
               )}
             </ul>
             <p className="mt-4 text-sm text-slate-500">
-              Experience: {resume.years_experience} years
+              Experience: {resume.years_experience > 0 ? `${resume.years_experience} years` : "Not detected — re-upload after update, or add OpenAI key for better parsing"}
             </p>
+            {resume.search_query && (
+              <p className="mt-2 text-xs text-slate-400">
+                Search query: {resume.search_query}
+              </p>
+            )}
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <h4 className="font-semibold text-slate-800">Detected skills</h4>

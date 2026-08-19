@@ -31,6 +31,7 @@ class Resume(Base):
     skills_json: Mapped[str] = mapped_column(Text, default="[]")
     titles_json: Mapped[str] = mapped_column(Text, default="[]")
     years_experience: Mapped[int] = mapped_column(Integer, default=0)
+    search_query: Mapped[str] = mapped_column(String(500), default="")
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="resume")

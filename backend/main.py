@@ -15,7 +15,7 @@ from config import settings
 from database import get_db, init_db
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from models import Job, JobMatch, Resume, SearchProfile, User
-from resume_parser import parse_resume, to_json_list
+from resume_parser import parse_resume_async, to_json_list
 from schemas import (
     DashboardStats,
     JobOut,
@@ -125,7 +125,7 @@ async def upload_resume(
         shutil.copyfileobj(file.file, f)
 
     try:
-        raw, skills, titles, years = parse_resume(dest)
+        raw, skills, titles, years, search_query = await parse_resume_async(dest)
     except Exception as exc:
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=f"Could not parse resume: {exc}")
@@ -137,6 +137,7 @@ async def upload_resume(
         resume.skills_json = to_json_list(skills)
         resume.titles_json = to_json_list(titles)
         resume.years_experience = years
+        resume.search_query = search_query
         resume.uploaded_at = __import__("datetime").datetime.utcnow()
     else:
         resume = Resume(
@@ -146,6 +147,7 @@ async def upload_resume(
             skills_json=to_json_list(skills),
             titles_json=to_json_list(titles),
             years_experience=years,
+            search_query=search_query,
         )
         db.add(resume)
     db.commit()
@@ -159,6 +161,7 @@ async def upload_resume(
         titles=titles,
         years_experience=resume.years_experience,
         uploaded_at=resume.uploaded_at,
+        search_query=resume.search_query or "",
     )
 
 
@@ -173,6 +176,7 @@ def get_my_resume(user: User = Depends(get_current_user), db: Session = Depends(
         titles=json.loads(resume.titles_json),
         years_experience=resume.years_experience,
         uploaded_at=resume.uploaded_at,
+        search_query=getattr(resume, "search_query", "") or "",
     )
 
 
@@ -229,6 +233,8 @@ def list_jobs(
     user_id: Optional[int] = Query(None),
     saved: Optional[bool] = Query(None),
     applied: Optional[bool] = Query(None),
+    min_score: Optional[float] = Query(None),
+    include_weak: bool = Query(False),
     current: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -241,10 +247,16 @@ def list_jobs(
     )
     if match:
         q = q.filter(JobMatch.label == match)
+    elif not include_weak and saved is None and applied is None:
+        # Default: hide weak matches so the board stays useful
+        q = q.filter(JobMatch.label.in_(["close", "good"]))
     if saved is not None:
         q = q.filter(JobMatch.saved == saved)
     if applied is not None:
         q = q.filter(JobMatch.applied == applied)
+    threshold = min_score if min_score is not None else None
+    if threshold is not None:
+        q = q.filter(JobMatch.score >= threshold)
 
     results = []
     for jm, job in q.all():

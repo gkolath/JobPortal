@@ -32,13 +32,27 @@ TITLE_KEYWORDS = [
     "strategist", "coordinator", "specialist", "officer", "president", "founder",
 ]
 
-EXPERIENCE_PATTERN = re.compile(
-    r"(\d{1,2})\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)",
-    re.IGNORECASE,
-)
+EXPERIENCE_PATTERNS = [
+    re.compile(
+        r"(\d{1,2})\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:with|over|more than|nearly|about)\s+(\d{1,2})\+?\s*(?:years?|yrs?)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(\d{1,2})\+?\s*(?:years?|yrs?)\s+(?:in|of)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(\d{1,2})\+\s*(?:years?|yrs?)",
+        re.IGNORECASE,
+    ),
+]
 DATE_RANGE_PATTERN = re.compile(
     r"(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}|"
-    r"(?:19|20)\d{2}\s*[-–—]\s*(?:present|current)",
+    r"(?:19|20)\d{2}\s*[-–—]\s*(?:present|current|now)",
     re.IGNORECASE,
 )
 
@@ -123,19 +137,50 @@ def extract_titles(text: str) -> List[str]:
 
 
 def extract_years_experience(text: str) -> int:
-    matches = EXPERIENCE_PATTERN.findall(text)
-    if matches:
-        return max(int(m) for m in matches)
+    found_years: List[int] = []
+    for pattern in EXPERIENCE_PATTERNS:
+        for m in pattern.findall(text):
+            try:
+                found_years.append(int(m))
+            except ValueError:
+                continue
+    if found_years:
+        # Cap at a realistic career length
+        return min(max(found_years), 40)
 
-    years = set()
+    year_vals = set()
     for m in DATE_RANGE_PATTERN.finditer(text):
         chunk = m.group(0)
-        found = re.findall(r"(19|20)\d{2}", chunk)
-        years.update(int(y) for y in found)
+        for y in re.findall(r"(?:19|20)\d{2}", chunk):
+            year_vals.add(int(y))
 
-    if len(years) >= 2:
-        return max(years) - min(years)
+    if len(year_vals) >= 2:
+        span = max(year_vals) - min(year_vals)
+        return min(max(span, 0), 40)
     return 0
+
+
+async def parse_resume_async(path: Path) -> Tuple[str, List[str], List[str], int, str]:
+    """Parse resume; optionally enrich with OpenAI. Returns search_query hint."""
+    raw = extract_text(path)
+    skills = extract_skills(raw)
+    titles = extract_titles(raw)
+    years = extract_years_experience(raw)
+    search_query = ""
+
+    from llm import enrich_resume_with_llm
+
+    enriched = await enrich_resume_with_llm(raw)
+    if enriched:
+        if enriched.get("skills"):
+            skills = sorted(set(skills + enriched["skills"]))
+        if enriched.get("titles"):
+            titles = enriched["titles"][:5]
+        if enriched.get("years_experience"):
+            years = max(years, enriched["years_experience"])
+        search_query = enriched.get("search_query") or ""
+
+    return raw, skills, titles, years, search_query
 
 
 def parse_resume(path: Path) -> Tuple[str, List[str], List[str], int]:

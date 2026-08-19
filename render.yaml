@@ -26,6 +26,12 @@ services:
         sync: false
       - key: RAPIDAPI_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: MIN_JOB_SCORE
+        value: "40"
 
 databases:
   - name: job-portal-db

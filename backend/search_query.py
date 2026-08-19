@@ -5,12 +5,13 @@ from typing import List
 FALSE_POSITIVE_SKILLS = {"go", "git", "r", "c", "qa", "etl", "nlp", "seo"}
 
 ROLE_QUERY_HINTS = {
-    "chief of staff": "Chief of Staff OR Operations Manager OR Strategy",
-    "operations": "Operations Manager OR Head of Operations",
-    "hr": "HR Manager OR Human Resources OR People Operations",
-    "human resources": "HR Manager OR Human Resources",
-    "strategy": "Strategy Manager OR Strategic Planning",
-    "project management": "Project Manager OR Program Manager",
+    "chief of staff": "Chief of Staff OR Head of Operations OR Strategy Director",
+    "operations": "Head of Operations OR Operations Director OR Operations Manager -junior -trainee -associate",
+    "hr": "HR Director OR Head of HR OR People Operations OR Talent Acquisition Lead",
+    "human resources": "HR Director OR Head of Human Resources OR People Partner",
+    "strategy": "Strategy Director OR Head of Strategy OR Strategic Planning Manager",
+    "project management": "Program Manager OR Project Director OR PMO Lead",
+    "recruitment": "Talent Acquisition Lead OR Recruitment Manager OR Head of Talent",
 }
 
 

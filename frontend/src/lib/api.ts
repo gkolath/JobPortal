@@ -38,6 +38,7 @@ export interface Resume {
   titles: string[];
   years_experience: number;
   uploaded_at: string;
+  search_query?: string;
 }
 
 export interface SearchProfile {

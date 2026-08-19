@@ -46,3 +46,11 @@ def _migrate():
             conn.execute(
                 text("ALTER TABLE search_profiles ADD COLUMN locations_json TEXT DEFAULT '[]'")
             )
+
+    if "resumes" in inspector.get_table_names():
+        resume_cols = {c["name"] for c in inspector.get_columns("resumes")}
+        if "search_query" not in resume_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE resumes ADD COLUMN search_query VARCHAR(500) DEFAULT ''")
+                )
