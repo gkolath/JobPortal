@@ -25,9 +25,20 @@ export default function ProfilePage() {
   }, []);
 
   const handleUpload = async (file: File) => {
+    setMessage("Parsing resume…");
     const res = await api.uploadResume(file);
     setResume(res);
-    setMessage("Resume uploaded and parsed successfully.");
+    setMessage("Resume parsed. Fetching jobs matched to your new profile (this may take a minute)…");
+    try {
+      const refresh = await api.refreshJobs();
+      setMessage(
+        `Done! Fetched ${refresh.jobs_fetched} jobs and scored ${refresh.matches_updated} matches. Go to Jobs or Dashboard to browse.`
+      );
+    } catch (e) {
+      setMessage(
+        `Resume saved, but job fetch timed out. Click Refresh jobs on the Dashboard to try again.`
+      );
+    }
   };
 
   const handleSave = async (e: FormEvent) => {

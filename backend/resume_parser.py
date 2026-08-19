@@ -17,17 +17,26 @@ SKILL_DICTIONARY = [
     "figma", "ui/ux", "html", "css", "tailwind", "next.js", "graphql", "rest api",
     "microservices", "kafka", "spark", "hadoop", "etl", "devops", "selenium", "testing",
     "qa", "android", "ios", "swift", "kotlin", "c++", "c#", ".net", "ruby", "rails",
-    "php", "laravel", "go", "golang", "rust", "blockchain", "cybersecurity",
+    "php", "laravel", "golang", "rust", "blockchain", "cybersecurity",
+    "chief of staff", "operations", "strategy", "strategic planning", "program management",
+    "change management", "executive support", "business development", "partnerships",
+    "venture capital", "private equity", "consulting", "mba", "financial modeling",
+    "budgeting", "forecasting", "okrs", "kpi", "people management", "hiring",
 ]
 
-TITLE_PATTERNS = [
-    r"(?:^|\n)\s*((?:senior|sr\.?|lead|principal|staff|junior|jr\.?|associate|head of)\s+)?"
-    r"([a-zA-Z][a-zA-Z\s/&-]{2,40}(?:engineer|developer|manager|analyst|designer|architect|consultant|specialist|director|lead))",
-    r"(?:^|\n)\s*([A-Z][a-zA-Z\s/&-]{2,40}(?:Engineer|Developer|Manager|Analyst|Designer|Architect|Consultant|Specialist|Director|Lead))",
+TITLE_KEYWORDS = [
+    "chief of staff", "head of", "director", "vice president", "vp ", "manager",
+    "engineer", "developer", "analyst", "consultant", "lead", "architect", "designer",
+    "strategist", "coordinator", "specialist", "officer", "president", "founder",
 ]
 
 EXPERIENCE_PATTERN = re.compile(
     r"(\d{1,2})\+?\s*(?:years?|yrs?)\s+(?:of\s+)?(?:experience|exp)",
+    re.IGNORECASE,
+)
+DATE_RANGE_PATTERN = re.compile(
+    r"(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}|"
+    r"(?:19|20)\d{2}\s*[-–—]\s*(?:present|current)",
     re.IGNORECASE,
 )
 
@@ -53,36 +62,68 @@ def extract_text(path: Path) -> str:
     raise ValueError(f"Unsupported file type: {suffix}")
 
 
+def _skill_in_text(skill: str, text: str) -> bool:
+    if " " in skill or "+" in skill or "/" in skill:
+        return skill in text
+    return bool(re.search(rf"\b{re.escape(skill)}\b", text))
+
+
 def extract_skills(text: str) -> List[str]:
     lower = text.lower()
     found = []
-    for skill in SKILL_DICTIONARY:
-        if skill in lower:
+    for skill in sorted(SKILL_DICTIONARY, key=len, reverse=True):
+        if _skill_in_text(skill, lower):
             found.append(skill)
     return sorted(set(found))
 
 
+def _is_junk_title(title: str) -> bool:
+    lower = title.lower()
+    junk_phrases = ["managing", "partnered", "cross-functional", "multi-venture", "strategic alignment"]
+    return any(p in lower for p in junk_phrases)
+
+
 def extract_titles(text: str) -> List[str]:
     titles = []
-    for pattern in TITLE_PATTERNS:
-        for match in re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE):
-            groups = [g for g in match.groups() if g]
-            title = " ".join(groups).strip()
-            if 3 < len(title) < 60:
-                titles.append(title.title())
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+    for line in lines[:12]:
+        clean = line.strip("•|- ")
+        if 4 < len(clean) < 70 and not re.search(r"@|https?://|linkedin", clean, re.I):
+            lower = clean.lower()
+            if any(kw in lower for kw in TITLE_KEYWORDS):
+                titles.append(clean.title() if clean.isupper() else clean)
+
+    for line in lines[:8]:
+        if "/" in line and len(line) < 70:
+            titles.append(line.strip())
+
     if not titles:
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
         for line in lines[:15]:
-            if any(kw in line.lower() for kw in ["engineer", "developer", "manager", "analyst", "designer"]):
-                titles.append(line[:60])
+            if any(kw in line.lower() for kw in TITLE_KEYWORDS) and len(line) < 70:
+                titles.append(line[:70])
                 break
-    return list(dict.fromkeys(titles))[:5]
+
+    deduped = []
+    for t in titles:
+        if not _is_junk_title(t) and t not in deduped:
+            deduped.append(t)
+    return deduped[:5]
 
 
 def extract_years_experience(text: str) -> int:
     matches = EXPERIENCE_PATTERN.findall(text)
     if matches:
         return max(int(m) for m in matches)
+
+    years = set()
+    for m in DATE_RANGE_PATTERN.finditer(text):
+        chunk = m.group(0)
+        found = re.findall(r"(19|20)\d{2}", chunk)
+        years.update(int(y) for y in found)
+
+    if len(years) >= 2:
+        return max(years) - min(years)
     return 0
 
 

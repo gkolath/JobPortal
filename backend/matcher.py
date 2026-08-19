@@ -30,8 +30,14 @@ def skill_score(resume_skills: List[str], description: str, job_title: str) -> f
     if not resume_skills:
         return 0.0
     haystack = f"{job_title} {description}".lower()
-    matched = sum(1 for s in resume_skills if s in haystack)
+    matched = sum(1 for s in resume_skills if _skill_in_text(s, haystack))
     return min((matched / len(resume_skills)) * 100, 100.0)
+
+
+def _skill_in_text(skill: str, text: str) -> bool:
+    if " " in skill or "+" in skill or "/" in skill:
+        return skill in text
+    return bool(re.search(rf"\b{re.escape(skill)}\b", text))
 
 
 def seniority_score(years: int, job_title: str, description: str) -> float:

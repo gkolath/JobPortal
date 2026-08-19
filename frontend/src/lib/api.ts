@@ -127,6 +127,7 @@ export const api = {
   refreshJobs: () =>
     request<{ jobs_fetched: number; matches_updated: number }>("/jobs/refresh", {
       method: "POST",
+      signal: AbortSignal.timeout(120000),
     }),
 
   updateJobStatus: (jobId: number, data: { saved?: boolean; applied?: boolean; notes?: string }) =>

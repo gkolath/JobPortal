@@ -77,6 +77,35 @@ def match_jobs_for_user(db: Session, user: User) -> int:
     return count
 
 
+async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
+    resume = db.query(Resume).filter(Resume.user_id == user.id).first()
+    profile = _get_or_create_search_profile(db, user)
+    skills = json.loads(resume.skills_json) if resume else []
+    titles = json.loads(resume.titles_json) if resume else []
+    keywords = build_search_keywords(skills, titles, profile.extra_keywords)
+    locations = parse_locations(profile.locations_json, profile.location, profile.country)
+
+    all_fetched = []
+    for loc in locations:
+        adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
+        jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
+        all_fetched.extend(adzuna + jsearch)
+
+    seen = set()
+    unique = []
+    for item in all_fetched:
+        key = (item["external_id"], item["source"])
+        if key not in seen and item.get("title"):
+            seen.add(key)
+            unique.append(item)
+
+    for data in unique:
+        upsert_job(db, data)
+
+    matched = match_jobs_for_user(db, user)
+    return len(unique), matched
+
+
 async def refresh_all_jobs(db: Session) -> tuple:
     users = db.query(User).all()
     all_fetched = []
