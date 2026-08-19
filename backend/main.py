@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from auth import create_access_token, get_current_user, hash_password, verify_password
 from config import settings
 from database import get_db, init_db
+from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from models import Job, JobMatch, Resume, SearchProfile, User
 from resume_parser import parse_resume, to_json_list
 from schemas import (
@@ -25,10 +26,22 @@ from schemas import (
     ResumeOut,
     SearchProfileOut,
     SearchProfileUpdate,
+    LocationItem,
     TokenResponse,
     UserOut,
 )
 from services import match_jobs_for_user, refresh_all_jobs
+
+
+def profile_to_out(profile: SearchProfile) -> SearchProfileOut:
+    locs = parse_locations(profile.locations_json, profile.location, profile.country)
+    return SearchProfileOut(
+        country=profile.country,
+        location=profile.location,
+        locations=[LocationItem(**loc) for loc in locs],
+        extra_keywords=profile.extra_keywords,
+    )
+
 
 app = FastAPI(title="Job Match Portal", version="1.0.0")
 
@@ -63,7 +76,11 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    db.add(SearchProfile(user_id=user.id, location=settings.default_location))
+    db.add(SearchProfile(
+        user_id=user.id,
+        location=settings.default_location,
+        locations_json=DEFAULT_LOCATIONS_JSON,
+    ))
     db.commit()
 
     token = create_access_token(user.id, user.email)
@@ -163,11 +180,15 @@ def get_my_resume(user: User = Depends(get_current_user), db: Session = Depends(
 def get_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.query(SearchProfile).filter(SearchProfile.user_id == user.id).first()
     if not profile:
-        profile = SearchProfile(user_id=user.id, location=settings.default_location)
+        profile = SearchProfile(
+            user_id=user.id,
+            location=settings.default_location,
+            locations_json=DEFAULT_LOCATIONS_JSON,
+        )
         db.add(profile)
         db.commit()
         db.refresh(profile)
-    return SearchProfileOut.model_validate(profile)
+    return profile_to_out(profile)
 
 
 @app.put("/api/profile", response_model=SearchProfileOut)
@@ -186,9 +207,14 @@ def update_profile(
         profile.location = data.location
     if data.extra_keywords is not None:
         profile.extra_keywords = data.extra_keywords
+    if data.locations is not None:
+        profile.locations_json = json.dumps([loc.model_dump() for loc in data.locations])
+        if data.locations:
+            profile.location = data.locations[0].city
+            profile.country = data.locations[0].country
     db.commit()
     db.refresh(profile)
-    return SearchProfileOut.model_validate(profile)
+    return profile_to_out(profile)
 
 
 @app.post("/api/jobs/refresh", response_model=RefreshResponse)

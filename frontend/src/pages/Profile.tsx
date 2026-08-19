@@ -7,6 +7,13 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<SearchProfile>({
     country: "in",
     location: "Bangalore",
+    locations: [
+      { city: "Dubai", country: "ae" },
+      { city: "Kochi", country: "in" },
+      { city: "Bangalore", country: "in" },
+      { city: "Abu Dhabi", country: "ae" },
+      { city: "Singapore", country: "sg" },
+    ],
     extra_keywords: "",
   });
   const [saving, setSaving] = useState(false);
@@ -99,22 +106,20 @@ export default function ProfilePage() {
         <h3 className="mb-4 text-lg font-semibold">Search preferences</h3>
         <form onSubmit={handleSave} className="max-w-lg space-y-4 rounded-xl border border-slate-200 bg-white p-6">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Country code</label>
-            <input
-              value={profile.country}
-              onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="in"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Location</label>
-            <input
-              value={profile.location}
-              onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Bangalore"
-            />
+            <label className="mb-2 block text-sm font-medium text-slate-700">Search cities</label>
+            <div className="flex flex-wrap gap-2">
+              {profile.locations.map((loc) => (
+                <span
+                  key={`${loc.city}-${loc.country}`}
+                  className="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800"
+                >
+                  {loc.city} ({loc.country.toUpperCase()})
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Jobs are fetched from all cities above on each refresh.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Extra keywords</label>

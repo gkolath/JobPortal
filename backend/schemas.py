@@ -41,15 +41,22 @@ class ResumeOut(BaseModel):
         from_attributes = True
 
 
+class LocationItem(BaseModel):
+    city: str
+    country: str
+
+
 class SearchProfileUpdate(BaseModel):
     country: Optional[str] = None
     location: Optional[str] = None
+    locations: Optional[List[LocationItem]] = None
     extra_keywords: Optional[str] = None
 
 
 class SearchProfileOut(BaseModel):
     country: str
     location: str
+    locations: List[LocationItem]
     extra_keywords: str
 
     class Config:

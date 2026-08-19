@@ -7,6 +7,7 @@ A shared web app for you and a friend to upload resumes, fetch jobs from externa
 - JWT auth (max 2 users)
 - Resume upload (PDF/DOCX) with skill/title extraction
 - Job fetch from Adzuna (+ optional JSearch fallback)
+- Multi-city search: Dubai, Kochi, Bangalore, Abu Dhabi, Singapore
 - Match scoring: Close (≥75%), Good (55–74%), Weak (<55%)
 - Dashboard, job board with filters, save/applied tracking
 - Toggle between your matches and your friend's matches
@@ -14,14 +15,13 @@ A shared web app for you and a friend to upload resumes, fetch jobs from externa
 ## Quick start (local)
 
 ```bash
-# Backend only (serves API; frontend needs build or Docker)
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # edit with your keys
 
 cd backend
-python seed.py         # creates george@example.com / friend@example.com (changeme123)
+python seed.py
 uvicorn main:app --reload --port 8000
 ```
 
@@ -40,7 +40,7 @@ chmod +x scripts/start.sh
 ```
 
 Default logins (change after first use):
-- `george@example.com` / `changeme123`
+- `gkolath85@hotmail.com` / `changeme123`
 - `friend@example.com` / `changeme123`
 
 ## Environment variables
@@ -51,41 +51,47 @@ Default logins (change after first use):
 | `JWT_SECRET` | Secret for signing tokens |
 | `ADZUNA_APP_ID` | Adzuna API app ID |
 | `ADZUNA_APP_KEY` | Adzuna API key |
-| `ADZUNA_COUNTRY` | Country code (default: `in`) |
+| `ADZUNA_COUNTRY` | Default country code (default: `in`) |
 | `RAPIDAPI_KEY` | Optional JSearch fallback |
 | `DEFAULT_LOCATION` | Default city (default: `Bangalore`) |
-| `RUN_SEED` | Set to `1` on first Railway deploy to seed users |
+| `RUN_SEED` | Set to `1` on first Render deploy to seed users |
 
-## Deploy to Railway
+## Deploy to Render
 
-> **Note:** Your Railway trial has expired. Upgrade at [railway.app](https://railway.app) to create new projects, or use the Render alternative below.
+Render is the recommended host — free tier includes a web service + PostgreSQL.
 
-1. Push this repo to GitHub
-2. Create a new Railway project → Deploy from GitHub repo
-3. Add **PostgreSQL** plugin (Railway sets `DATABASE_URL` automatically)
-4. Set environment variables: `JWT_SECRET`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`
-5. Set `RUN_SEED=1` for the first deploy, then remove it
-6. Railway builds via Dockerfile and exposes an HTTPS URL — share with your friend
+### Option A: Blueprint (easiest)
 
-Or use the CLI (after upgrading your plan):
-
-```bash
-railway login
-railway init --name job-match-portal
-railway add --database postgres
-railway variables set JWT_SECRET=$(openssl rand -hex 32)
-railway variables set ADZUNA_APP_ID=your_id ADZUNA_APP_KEY=your_key RUN_SEED=1
-railway up
-railway domain
-```
-
-## Deploy to Render (free alternative)
-
-1. Push this repo to GitHub or GitLab
+1. Push this repo to **GitHub** or **GitLab**
 2. Go to [dashboard.render.com](https://dashboard.render.com) → **New** → **Blueprint**
-3. Connect your repo — Render reads `render.yaml` and provisions web + Postgres
-4. Add `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` in the dashboard
-5. After first deploy, remove `RUN_SEED` or set it to `0`
+3. Connect your repo — Render reads `render.yaml` and provisions:
+   - Web service (Docker build)
+   - PostgreSQL database
+4. When prompted, set these secrets in the dashboard:
+   - `ADZUNA_APP_ID`
+   - `ADZUNA_APP_KEY`
+   - `RAPIDAPI_KEY` (optional)
+5. Deploy — Render gives you an `https://*.onrender.com` URL to share
+6. After first successful deploy, set `RUN_SEED` to `0` (or remove it)
+
+### Option B: Manual setup
+
+1. **New → PostgreSQL** (free plan) — note the internal connection string
+2. **New → Web Service** → connect repo → **Docker** runtime
+3. Set environment variables:
+   - `DATABASE_URL` — from Postgres service
+   - `JWT_SECRET` — generate with `openssl rand -hex 32`
+   - `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`
+   - `RUN_SEED=1` (first deploy only)
+4. Health check path: `/api/health`
+
+See `scripts/deploy-render.sh` for a step-by-step checklist.
+
+### Render free tier notes
+
+- Web service spins down after 15 min idle (~30s cold start on next visit)
+- Free Postgres expires after 30 days (upgrade to keep data)
+- Uploaded resumes live on the container filesystem — they reset on redeploy unless you add a persistent disk
 
 ## API endpoints
 
@@ -105,8 +111,8 @@ railway domain
 job-portal/
 ├── backend/          # FastAPI app
 ├── frontend/         # React + Vite + Tailwind
-├── scripts/          # start.sh, seed helpers
+├── scripts/          # start.sh, deploy-render.sh
 ├── Dockerfile
-├── railway.toml
+├── render.yaml       # Render Blueprint
 └── requirements.txt
 ```

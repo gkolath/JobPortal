@@ -43,6 +43,7 @@ class SearchProfile(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
     country: Mapped[str] = mapped_column(String(10), default="in")
     location: Mapped[str] = mapped_column(String(120), default="Bangalore")
+    locations_json: Mapped[str] = mapped_column(Text, default="[]")
     extra_keywords: Mapped[str] = mapped_column(String(500), default="")
 
     user: Mapped["User"] = relationship(back_populates="search_profile")

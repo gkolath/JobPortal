@@ -1,0 +1,27 @@
+#!/bin/bash
+# Deploy checklist for Render
+set -e
+
+echo "=== Job Portal — Render Deploy ==="
+echo ""
+echo "Prerequisites:"
+echo "  1. Render account: https://render.com"
+echo "  2. Repo pushed to GitHub or GitLab"
+echo "  3. Adzuna API keys: https://developer.adzuna.com"
+echo ""
+echo "Blueprint deploy (recommended):"
+echo "  1. dashboard.render.com → New → Blueprint"
+echo "  2. Connect this repo"
+echo "  3. Set ADZUNA_APP_ID and ADZUNA_APP_KEY when prompted"
+echo "  4. Deploy — share the *.onrender.com URL with your friend"
+echo "  5. After first deploy, set RUN_SEED=0 in the web service env"
+echo ""
+echo "Manual env vars to verify in the web service:"
+echo "  DATABASE_URL      (auto-linked from Postgres via render.yaml)"
+echo "  JWT_SECRET        (auto-generated via render.yaml)"
+echo "  ADZUNA_APP_ID"
+echo "  ADZUNA_APP_KEY"
+echo "  RAPIDAPI_KEY      (optional)"
+echo "  RUN_SEED=1        (first deploy only)"
+echo ""
+echo "Health check path: /api/health"

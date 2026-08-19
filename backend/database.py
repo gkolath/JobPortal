@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from config import settings
@@ -33,3 +33,16 @@ def init_db():
     )
 
     Base.metadata.create_all(bind=engine)
+    _migrate()
+
+
+def _migrate():
+    inspector = inspect(engine)
+    if "search_profiles" not in inspector.get_table_names():
+        return
+    columns = {c["name"] for c in inspector.get_columns("search_profiles")}
+    if "locations_json" not in columns:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE search_profiles ADD COLUMN locations_json TEXT DEFAULT '[]'")
+            )

@@ -42,6 +42,7 @@ export interface Resume {
 export interface SearchProfile {
   country: string;
   location: string;
+  locations: { city: string; country: string }[];
   extra_keywords: string;
 }
 

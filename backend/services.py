@@ -6,6 +6,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from job_fetcher import build_search_keywords, fetch_adzuna_jobs, fetch_jsearch_jobs
+from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from matcher import compute_score
 from models import Job, JobMatch, Resume, SearchProfile, User
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 def _get_or_create_search_profile(db: Session, user: User) -> SearchProfile:
     profile = db.query(SearchProfile).filter(SearchProfile.user_id == user.id).first()
     if not profile:
-        profile = SearchProfile(user_id=user.id)
+        profile = SearchProfile(user_id=user.id, locations_json=DEFAULT_LOCATIONS_JSON)
         db.add(profile)
         db.commit()
         db.refresh(profile)
@@ -86,10 +87,14 @@ async def refresh_all_jobs(db: Session) -> tuple:
         skills = json.loads(resume.skills_json) if resume else []
         titles = json.loads(resume.titles_json) if resume else []
         keywords = build_search_keywords(skills, titles, profile.extra_keywords)
+        locations = parse_locations(
+            profile.locations_json, profile.location, profile.country
+        )
 
-        adzuna = await fetch_adzuna_jobs(keywords, profile.location, profile.country)
-        jsearch = await fetch_jsearch_jobs(keywords, profile.location)
-        all_fetched.extend(adzuna + jsearch)
+        for loc in locations:
+            adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
+            jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
+            all_fetched.extend(adzuna + jsearch)
 
     seen = set()
     unique = []

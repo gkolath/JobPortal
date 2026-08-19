@@ -3,6 +3,7 @@ services:
     name: job-match-portal
     runtime: docker
     plan: free
+    region: singapore
     healthCheckPath: /api/health
     envVars:
       - key: JWT_SECRET
@@ -29,5 +30,6 @@ services:
 databases:
   - name: job-portal-db
     plan: free
+    region: singapore
     databaseName: jobportal
     user: jobportal

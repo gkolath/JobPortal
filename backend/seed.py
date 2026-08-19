@@ -6,6 +6,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from locations import DEFAULT_LOCATIONS_JSON
 from auth import hash_password
 from database import SessionLocal, init_db
 from models import SearchProfile, User
@@ -17,7 +18,7 @@ def main():
     db = SessionLocal()
 
     users = [
-        {"name": "George", "email": "george@example.com", "password": "changeme123"},
+        {"name": "George", "email": "gkolath85@hotmail.com", "password": "changeme123"},
         {"name": "Friend", "email": "friend@example.com", "password": "changeme123"},
     ]
 
@@ -34,7 +35,12 @@ def main():
         db.add(user)
         db.commit()
         db.refresh(user)
-        db.add(SearchProfile(user_id=user.id, location=settings.default_location, country="in"))
+        db.add(SearchProfile(
+            user_id=user.id,
+            location=settings.default_location,
+            country="in",
+            locations_json=DEFAULT_LOCATIONS_JSON,
+        ))
         db.commit()
         print(f"Created: {u['email']} / {u['password']}")
 
