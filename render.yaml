@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: job-match-portal
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADZUNA_COUNTRY
+        value: in
+      - key: DEFAULT_LOCATION
+        value: Bangalore
+      - key: MAX_USERS
+        value: "2"
+      - key: RUN_SEED
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: job-portal-db
+          property: connectionString
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+
+databases:
+  - name: job-portal-db
+    plan: free
+    databaseName: jobportal
+    user: jobportal

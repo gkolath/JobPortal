@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/jobcard.tsx","./src/components/layout.tsx","./src/components/matchbadge.tsx","./src/components/resumeupload.tsx","./src/lib/api.ts","./src/lib/auth.tsx","./src/pages/dashboard.tsx","./src/pages/jobs.tsx","./src/pages/login.tsx","./src/pages/profile.tsx"],"version":"5.9.3"}
