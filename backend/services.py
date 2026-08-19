@@ -13,6 +13,7 @@ from llm import openai_enabled, score_job_with_llm
 from matcher import compute_score, label_from_score
 from models import Job, JobMatch, Resume, SearchProfile, User
 from search_query import filter_skills
+from text_utils import html_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -35,20 +36,26 @@ def _get_or_create_search_profile(db: Session, user: User) -> SearchProfile:
 
 
 def upsert_job(db: Session, data: dict) -> Job:
+    payload = dict(data)
+    payload["description"] = html_to_text(payload.get("description") or "")
+    payload["title"] = html_to_text(payload.get("title") or "")
+    payload["company"] = html_to_text(payload.get("company") or "")
+    payload["location"] = html_to_text(payload.get("location") or "")
+
     job = (
         db.query(Job)
-        .filter(Job.external_id == data["external_id"], Job.source == data["source"])
+        .filter(Job.external_id == payload["external_id"], Job.source == payload["source"])
         .first()
     )
     if job:
-        job.title = data["title"]
-        job.company = data.get("company", "")
-        job.location = data.get("location", "")
-        job.description = data.get("description", "")
-        job.url = data.get("url", "")
+        job.title = payload["title"]
+        job.company = payload.get("company", "")
+        job.location = payload.get("location", "")
+        job.description = payload.get("description", "")
+        job.url = payload.get("url", "")
         job.fetched_at = datetime.utcnow()
     else:
-        job = Job(**data)
+        job = Job(**payload)
         db.add(job)
     db.commit()
     db.refresh(job)

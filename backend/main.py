@@ -35,6 +35,7 @@ from schemas import (
 from llm import analyze_skill_gaps_llm, draft_cover_letter, openai_enabled
 from search_query import filter_skills
 from services import refresh_jobs_for_user
+from text_utils import html_to_text
 
 
 def profile_to_out(profile: SearchProfile) -> SearchProfileOut:
