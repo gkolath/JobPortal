@@ -17,6 +17,14 @@ class Settings(BaseSettings):
 
     rapidapi_key: str = ""
 
+    # Apify LinkedIn job scrape (optional — adds many more listings)
+    apify_token: str = ""
+    apify_enabled: bool = True
+    apify_job_actor: str = "harvestapi/linkedin-job-search"
+    apify_max_items: int = 25  # per title × location; ~$0.001/job
+    apify_posted_limit: str = "Past Month"
+    apify_timeout_secs: int = 300
+
     default_location: str = "Bangalore"
     max_users: int = 3
     min_job_score: float = 40.0

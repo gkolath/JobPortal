@@ -5,7 +5,12 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from job_fetcher import build_search_keywords, fetch_adzuna_jobs, fetch_jsearch_jobs
+from job_fetcher import (
+    build_search_keywords,
+    fetch_adzuna_jobs,
+    fetch_apify_linkedin_jobs,
+    fetch_jsearch_jobs,
+)
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from config import settings
 from matcher import compute_score
@@ -114,10 +119,14 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     clear_all_jobs(db)
 
     all_fetched = []
+    cities = [loc["city"] for loc in locations]
     for loc in locations:
         adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
         jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
         all_fetched.extend(adzuna + jsearch)
+
+    apify_jobs = await fetch_apify_linkedin_jobs(titles, keywords, cities)
+    all_fetched.extend(apify_jobs)
 
     seen = set()
     unique = []
@@ -155,10 +164,14 @@ async def refresh_all_jobs(db: Session) -> tuple:
         )
         logger.info("Job search keywords for user %s: %s", user.id, keywords)
 
+        cities = [loc["city"] for loc in locations]
         for loc in locations:
             adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
             jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
             all_fetched.extend(adzuna + jsearch)
+
+        apify_jobs = await fetch_apify_linkedin_jobs(titles, keywords, cities)
+        all_fetched.extend(apify_jobs)
 
     # Replace the board so old software listings don't stick around
     clear_all_jobs(db)

@@ -4,9 +4,9 @@ A shared web app for you and a friend to upload resumes, fetch jobs from externa
 
 ## Features
 
-- JWT auth (max 2 users)
+- JWT auth (max 3 users)
 - Resume upload (PDF/DOCX) with skill/title extraction
-- Job fetch from Adzuna (+ optional JSearch fallback)
+- Job fetch from Adzuna (+ optional JSearch + Apify LinkedIn)
 - Multi-city search: Dubai, Kochi, Bangalore, Abu Dhabi, Singapore
 - Match scoring: Close (≥75%), Good (55–74%), Weak (<55%)
 - Dashboard, job board with filters, save/applied tracking
@@ -54,6 +54,9 @@ Default logins (change after first use):
 | `ADZUNA_APP_KEY` | Adzuna API key |
 | `ADZUNA_COUNTRY` | Default country code (default: `in`) |
 | `RAPIDAPI_KEY` | Optional JSearch fallback |
+| `APIFY_TOKEN` | Apify API token for LinkedIn job scrape ([create one](https://console.apify.com/settings/integrations)) |
+| `APIFY_ENABLED` | Set `false` to disable Apify scrape |
+| `APIFY_MAX_ITEMS` | Max LinkedIn jobs per title×location (default `25`) |
 | `DEFAULT_LOCATION` | Default city (default: `Bangalore`) |
 | `RUN_SEED` | Set to `1` on first Render deploy to seed users |
 
@@ -71,6 +74,7 @@ Render is the recommended host — free tier includes a web service + PostgreSQL
 4. When prompted, set these secrets in the dashboard:
    - `ADZUNA_APP_ID`
    - `ADZUNA_APP_KEY`
+   - `APIFY_TOKEN` (recommended — LinkedIn jobs via Apify)
    - `RAPIDAPI_KEY` (optional)
 5. Deploy — Render gives you an `https://*.onrender.com` URL to share
 6. After first successful deploy, set `RUN_SEED` to `0` (or remove it)

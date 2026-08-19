@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -102,3 +103,148 @@ def build_search_keywords(skills: List[str], titles: List[str], extra: str = "")
     from search_query import primary_role_query
 
     return primary_role_query(titles, skills, extra)
+
+
+def _apify_job_titles(titles: List[str], keywords: str) -> List[str]:
+    """Pick short LinkedIn search queries from resume titles / keywords."""
+    cleaned: List[str] = []
+    seen = set()
+    for title in titles:
+        text = (title or "").strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text[:120])
+        if len(cleaned) >= 3:
+            return cleaned
+    if cleaned:
+        return cleaned
+    phrase = (keywords or "").strip()
+    if phrase:
+        return [phrase[:120]]
+    return []
+
+
+def _normalize_apify_location(item: dict, fallback: str) -> str:
+    loc = item.get("location")
+    if isinstance(loc, dict):
+        parsed = loc.get("parsed") or {}
+        return (
+            parsed.get("text")
+            or loc.get("linkedinText")
+            or fallback
+        )
+    if isinstance(loc, str) and loc.strip():
+        return loc
+    return fallback
+
+
+def _parse_apify_job(item: dict, fallback_location: str) -> Optional[dict]:
+    job_id = str(item.get("id") or "").strip()
+    title = (item.get("title") or "").strip()
+    if not job_id or not title:
+        return None
+
+    company = item.get("company") or {}
+    company_name = ""
+    if isinstance(company, dict):
+        company_name = company.get("name") or ""
+    elif isinstance(company, str):
+        company_name = company
+
+    apply = item.get("applyMethod") or {}
+    url = (
+        item.get("linkedinUrl")
+        or (apply.get("companyApplyUrl") if isinstance(apply, dict) else "")
+        or item.get("jobUrl")
+        or item.get("url")
+        or ""
+    )
+
+    return {
+        "external_id": job_id,
+        "source": "apify_linkedin",
+        "title": title,
+        "company": company_name,
+        "location": _normalize_apify_location(item, fallback_location),
+        "description": item.get("descriptionText") or item.get("description") or "",
+        "url": url,
+        "posted_at": _parse_adzuna_date(item.get("postedDate")),
+    }
+
+
+def _fetch_apify_linkedin_sync(
+    job_titles: List[str], locations: List[str], max_items: int
+) -> List[dict]:
+    from apify_client import ApifyClient
+
+    client = ApifyClient(token=settings.apify_token)
+    run_input = {
+        "jobTitles": job_titles,
+        "locations": locations,
+        "maxItems": max_items,
+        "sortBy": "relevant",
+        "postedLimit": settings.apify_posted_limit,
+    }
+    logger.info(
+        "Apify LinkedIn search titles=%s locations=%s maxItems=%s",
+        job_titles,
+        locations,
+        max_items,
+    )
+    run = client.actor(settings.apify_job_actor).call(
+        run_input=run_input,
+        timeout_secs=settings.apify_timeout_secs,
+    )
+    if not run:
+        logger.warning("Apify actor returned no run payload")
+        return []
+
+    status = run.get("status")
+    if status != "SUCCEEDED":
+        logger.error("Apify actor finished with status %s", status)
+        return []
+
+    dataset_id = run.get("defaultDatasetId")
+    if not dataset_id:
+        return []
+
+    fallback_location = locations[0] if locations else settings.default_location
+    results: List[dict] = []
+    for item in client.dataset(dataset_id).iterate_items():
+        if not isinstance(item, dict):
+            continue
+        normalized = _parse_apify_job(item, fallback_location)
+        if normalized:
+            results.append(normalized)
+    return results
+
+
+async def fetch_apify_linkedin_jobs(
+    titles: List[str],
+    keywords: str,
+    locations: List[str],
+) -> List[dict]:
+    """Fetch LinkedIn jobs via Apify Actor. No-ops if token is missing."""
+    if not settings.apify_enabled:
+        return []
+    if not settings.apify_token:
+        logger.warning("APIFY_TOKEN not configured — skipping LinkedIn scrape")
+        return []
+
+    job_titles = _apify_job_titles(titles, keywords)
+    cities = [c for c in locations if c]
+    if not job_titles or not cities:
+        return []
+
+    max_items = max(1, settings.apify_max_items)
+    try:
+        return await asyncio.to_thread(
+            _fetch_apify_linkedin_sync, job_titles, cities, max_items
+        )
+    except Exception:
+        logger.exception("Apify LinkedIn fetch failed")
+        return []
