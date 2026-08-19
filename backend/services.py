@@ -79,6 +79,20 @@ async def match_jobs_for_user(db: Session, user: User) -> int:
     jobs = db.query(Job).all()
     summary = _resume_summary(resume, skills, titles)
 
+    # Drop prior unsaved matches so scores always reflect the current resume
+    stale = (
+        db.query(JobMatch)
+        .filter(
+            JobMatch.user_id == user.id,
+            JobMatch.saved.is_(False),
+            JobMatch.applied.is_(False),
+        )
+        .all()
+    )
+    for m in stale:
+        db.delete(m)
+    db.commit()
+
     # Heuristic pass first
     candidates: List[tuple] = []  # (job, heuristic_score, label)
     for job in jobs:
@@ -86,13 +100,6 @@ async def match_jobs_for_user(db: Session, user: User) -> int:
             skills, titles, resume.years_experience, job.title, job.description
         )
         if score < settings.min_job_score and label == "weak":
-            existing = (
-                db.query(JobMatch)
-                .filter(JobMatch.user_id == user.id, JobMatch.job_id == job.id)
-                .first()
-            )
-            if existing and not existing.saved and not existing.applied:
-                db.delete(existing)
             continue
         candidates.append((job, score, label))
 
@@ -152,6 +159,7 @@ async def match_jobs_for_user(db: Session, user: User) -> int:
 
 
 async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
+    """Clear the shared board and fetch jobs for this user's current resume."""
     resume = db.query(Resume).filter(Resume.user_id == user.id).first()
     profile = _get_or_create_search_profile(db, user)
     skills = filter_skills(json.loads(resume.skills_json) if resume else [])
@@ -166,6 +174,7 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     locations = parse_locations(profile.locations_json, profile.location, profile.country)
     logger.info("Job search keywords for user %s: %s", user.id, keywords)
 
+    # Wipe stale listings from the previous resume before fetching
     clear_all_jobs(db)
 
     all_fetched = []
@@ -190,15 +199,22 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
         upsert_job(db, data)
 
     matched = await match_jobs_for_user(db, user)
+    # Re-score other users against the new board so their views aren't empty
+    for other in db.query(User).filter(User.id != user.id).all():
+        await match_jobs_for_user(db, other)
     return len(unique), matched
 
 
 async def refresh_all_jobs(db: Session) -> tuple:
     users = db.query(User).all()
-    all_fetched = []
+    # Clear first so a slow/failed fetch never leaves the previous resume's jobs
+    clear_all_jobs(db)
 
+    all_fetched = []
     for user in users:
         resume = db.query(Resume).filter(Resume.user_id == user.id).first()
+        if not resume:
+            continue
         profile = _get_or_create_search_profile(db, user)
         skills = filter_skills(json.loads(resume.skills_json) if resume else [])
         titles = json.loads(resume.titles_json) if resume else []
@@ -222,9 +238,6 @@ async def refresh_all_jobs(db: Session) -> tuple:
 
         apify_jobs = await fetch_apify_linkedin_jobs(titles, keywords, cities)
         all_fetched.extend(apify_jobs)
-
-    # Replace the board so old software listings don't stick around
-    clear_all_jobs(db)
 
     seen = set()
     unique = []

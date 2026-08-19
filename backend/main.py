@@ -34,7 +34,7 @@ from schemas import (
 )
 from llm import analyze_skill_gaps_llm, draft_cover_letter, openai_enabled
 from search_query import filter_skills
-from services import match_jobs_for_user, refresh_all_jobs
+from services import refresh_jobs_for_user
 
 
 def profile_to_out(profile: SearchProfile) -> SearchProfileOut:
@@ -157,7 +157,8 @@ async def upload_resume(
     db.commit()
     db.refresh(resume)
 
-    await match_jobs_for_user(db, user)
+    # Replace the job board using this resume — do not rematch against stale listings
+    jobs_fetched, matches_updated = await refresh_jobs_for_user(db, user)
 
     return ResumeOut(
         file_name=resume.file_name,
@@ -166,6 +167,8 @@ async def upload_resume(
         years_experience=resume.years_experience,
         uploaded_at=resume.uploaded_at,
         search_query=resume.search_query or "",
+        jobs_fetched=jobs_fetched,
+        matches_updated=matches_updated,
     )
 
 
@@ -227,7 +230,8 @@ def update_profile(
 
 @app.post("/api/jobs/refresh", response_model=RefreshResponse)
 async def refresh_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    fetched, matched = await refresh_all_jobs(db)
+    # Refresh using the logged-in user's resume so the board matches their profile
+    fetched, matched = await refresh_jobs_for_user(db, user)
     return RefreshResponse(jobs_fetched=fetched, matches_updated=matched)
 
 

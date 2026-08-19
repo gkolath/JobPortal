@@ -27,18 +27,19 @@ export default function ProfilePage() {
   }, []);
 
   const handleUpload = async (file: File) => {
-    setMessage("Parsing resume…");
-    const res = await api.uploadResume(file);
-    setResume(res);
-    setMessage("Resume parsed. Fetching jobs matched to your new profile (this may take a minute)…");
+    setMessage("Parsing resume and fetching matched jobs (this can take a few minutes)…");
+    setGaps(null);
     try {
-      const refresh = await api.refreshJobs();
+      const res = await api.uploadResume(file);
+      setResume(res);
       setMessage(
-        `Done! Fetched ${refresh.jobs_fetched} jobs and scored ${refresh.matches_updated} matches. Go to Jobs or Dashboard to browse.`
+        `Done! Parsed resume, fetched ${res.jobs_fetched ?? 0} jobs and scored ${res.matches_updated ?? 0} matches. Open Jobs or Dashboard to browse.`
       );
     } catch (e) {
       setMessage(
-        `Resume saved, but job fetch timed out. Click Refresh jobs on the Dashboard to try again.`
+        e instanceof Error
+          ? e.message
+          : "Upload or job fetch failed. Try again, or use Refresh jobs on the Dashboard."
       );
     }
   };

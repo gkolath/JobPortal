@@ -37,6 +37,8 @@ class ResumeOut(BaseModel):
     years_experience: int
     uploaded_at: datetime
     search_query: str = ""
+    jobs_fetched: int = 0
+    matches_updated: int = 0
 
     class Config:
         from_attributes = True

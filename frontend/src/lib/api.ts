@@ -47,6 +47,8 @@ export interface Resume {
   years_experience: number;
   uploaded_at: string;
   search_query?: string;
+  jobs_fetched?: number;
+  matches_updated?: number;
 }
 
 export interface SearchProfile {
@@ -161,7 +163,11 @@ export const api = {
   uploadResume: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<Resume>("/resumes/upload", { method: "POST", body: form });
+    return request<Resume>("/resumes/upload", {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(300000),
+    });
   },
 
   getResume: () => request<Resume | null>("/resumes/me"),
