@@ -182,7 +182,6 @@ async def fetch_arbeitnow_jobs(titles: List[str], keywords: str, cities: List[st
     needles = [t for t in titles if t][:5]
     if keywords:
         needles.append(keywords)
-    city_needles = [c.lower() for c in cities if c]
 
     results = []
     try:
