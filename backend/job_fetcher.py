@@ -110,32 +110,61 @@ async def fetch_jsearch_jobs(keywords: str, location: str, max_pages: int = 2) -
         "X-RapidAPI-Key": settings.rapidapi_key,
         "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    # Map common portal countries for JSearch v2
+    country = "in"
+    loc_lower = (location or "").lower()
+    if any(x in loc_lower for x in ("dubai", "abu dhabi", "uae")):
+        country = "ae"
+    elif "singapore" in loc_lower:
+        country = "sg"
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
         for page in range(1, max_pages + 1):
-            params = {"query": f"{keywords} in {location}", "page": str(page), "num_pages": "1"}
+            params = {
+                "query": f"{keywords} in {location}",
+                "page": str(page),
+                "num_pages": "1",
+                "country": country,
+                "date_posted": "month",
+            }
             try:
                 resp = await client.get(
-                    "https://jsearch.p.rapidapi.com/search",
+                    "https://jsearch.p.rapidapi.com/search-v2",
                     headers=headers,
                     params=params,
                 )
                 resp.raise_for_status()
-                data = resp.json()
+                payload = resp.json()
             except Exception:
                 logger.exception("JSearch fetch failed page %s", page)
                 break
 
-            for item in data.get("data", []):
+            # v2 wraps jobs under data.jobs; older shape used data[]
+            data = payload.get("data")
+            if isinstance(data, dict):
+                items = data.get("jobs") or []
+            elif isinstance(data, list):
+                items = data
+            else:
+                items = payload.get("jobs") or []
+
+            if not items:
+                break
+
+            for item in items:
                 results.append({
                     "external_id": item.get("job_id", item.get("job_link", "")),
                     "source": "jsearch",
                     "title": item.get("job_title", ""),
                     "company": item.get("employer_name", ""),
-                    "location": item.get("job_city", location) or location,
+                    "location": item.get("job_city")
+                    or item.get("job_location")
+                    or location,
                     "description": item.get("job_description", ""),
                     "url": item.get("job_apply_link", item.get("job_link", "")),
                     "posted_at": _parse_adzuna_date(item.get("job_posted_at_datetime_utc")),
                 })
+    logger.info("JSearch returned %s jobs for %r in %s", len(results), keywords, location)
     return results
 
 
