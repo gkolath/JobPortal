@@ -275,7 +275,7 @@ def list_jobs(
                 title=job.title,
                 company=job.company,
                 location=job.location,
-                description=job.description[:500],
+                description=html_to_text(job.description or "", max_len=500),
                 url=job.url,
                 source=job.source,
                 posted_at=job.posted_at,
