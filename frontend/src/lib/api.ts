@@ -50,6 +50,15 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (!detail) return fallback;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => (typeof d === "object" && d && "msg" in d ? String(d.msg) : String(d))).join(", ");
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -64,15 +73,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    window.location.href = "/login";
-    throw new Error("Unauthorized");
+    if (!path.includes("/auth/login")) {
+      window.location.href = "/login";
+    }
+    throw new Error("Invalid email or password");
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Request failed");
+    if (res.status === 404 || res.status === 502 || res.status === 503) {
+      throw new Error("Server is waking up — wait 30 seconds and try again");
+    }
+    throw new Error(formatErrorDetail(err.detail, res.statusText || "Request failed"));
   }
   if (res.status === 204) return {} as T;
   return res.json();
+}
+
+export async function waitForServer(maxAttempts = 12, delayMs = 5000): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      if (res.ok) return;
+    } catch {
+      // retry
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  throw new Error("Server is still starting — please wait a moment and refresh");
 }
 
 export const api = {
