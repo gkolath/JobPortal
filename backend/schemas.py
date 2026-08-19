@@ -91,6 +91,7 @@ class JobStatusUpdate(BaseModel):
 class DashboardStats(BaseModel):
     close_matches: int
     good_matches: int
+    weak_matches: int
     total_jobs: int
     saved_count: int
     applied_count: int

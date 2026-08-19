@@ -25,6 +25,7 @@ export interface Job {
 export interface DashboardStats {
   close_matches: number;
   good_matches: number;
+  weak_matches: number;
   total_jobs: number;
   saved_count: number;
   applied_count: number;

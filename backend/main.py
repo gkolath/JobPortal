@@ -299,6 +299,7 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
     return DashboardStats(
         close_matches=matches.filter(JobMatch.label == "close").count(),
         good_matches=matches.filter(JobMatch.label == "good").count(),
+        weak_matches=matches.filter(JobMatch.label == "weak").count(),
         total_jobs=matches.count(),
         saved_count=matches.filter(JobMatch.saved.is_(True)).count(),
         applied_count=matches.filter(JobMatch.applied.is_(True)).count(),

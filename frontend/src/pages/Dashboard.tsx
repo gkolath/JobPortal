@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, DashboardStats } from "../lib/api";
+import { api, DashboardStats, Job } from "../lib/api";
+import JobCard from "../components/JobCard";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [topJobs, setTopJobs] = useState<Job[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState("");
 
-  const load = () => api.dashboard().then(setStats);
+  const load = async () => {
+    const [dashboard, jobs] = await Promise.all([
+      api.dashboard(),
+      api.jobs({}),
+    ]);
+    setStats(dashboard);
+    setTopJobs(jobs.slice(0, 5));
+  };
 
   useEffect(() => {
     load();
@@ -32,11 +41,11 @@ export default function DashboardPage() {
   }
 
   const cards = [
-    { label: "Close matches", value: stats.close_matches, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Good matches", value: stats.good_matches, color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Total scored", value: stats.total_jobs, color: "text-brand-600", bg: "bg-brand-50" },
-    { label: "Saved", value: stats.saved_count, color: "text-sky-600", bg: "bg-sky-50" },
-    { label: "Applied", value: stats.applied_count, color: "text-violet-600", bg: "bg-violet-50" },
+    { label: "Close matches", sub: "≥75% fit", value: stats.close_matches, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Good matches", sub: "55–74% fit", value: stats.good_matches, color: "text-amber-600", bg: "bg-amber-50" },
+    { label: "All jobs", sub: "scored for you", value: stats.total_jobs, color: "text-brand-600", bg: "bg-brand-50" },
+    { label: "Saved", sub: "bookmarked", value: stats.saved_count, color: "text-sky-600", bg: "bg-sky-50" },
+    { label: "Applied", sub: "marked applied", value: stats.applied_count, color: "text-violet-600", bg: "bg-violet-50" },
   ];
 
   return (
@@ -44,7 +53,12 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
-          <p className="text-slate-500">Your job match overview</p>
+          <p className="text-slate-500">
+            {stats.total_jobs} jobs scored against your resume
+            {stats.weak_matches > 0 && stats.close_matches === 0 && stats.good_matches === 0
+              ? " — browse all jobs on the Jobs tab"
+              : ""}
+          </p>
         </div>
         <button
           onClick={handleRefresh}
@@ -77,27 +91,58 @@ export default function DashboardPage() {
         {cards.map((c) => (
           <div key={c.label} className={`rounded-xl border border-slate-200 ${c.bg} p-5`}>
             <p className="text-sm font-medium text-slate-600">{c.label}</p>
+            <p className="text-xs text-slate-400">{c.sub}</p>
             <p className={`mt-2 text-3xl font-bold ${c.color}`}>{c.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Link
+          to="/jobs"
+          className="rounded-xl border-2 border-brand-300 bg-white p-6 shadow-sm transition hover:shadow-md"
+        >
+          <h3 className="font-semibold text-brand-800">View all jobs ({stats.total_jobs})</h3>
+          <p className="mt-1 text-sm text-slate-500">Browse every job scored for your profile</p>
+        </Link>
         <Link
           to="/jobs?match=close"
           className="rounded-xl border border-emerald-200 bg-white p-6 shadow-sm transition hover:shadow-md"
         >
-          <h3 className="font-semibold text-emerald-800">View close matches</h3>
-          <p className="mt-1 text-sm text-slate-500">Jobs scoring 75% or higher for you</p>
+          <h3 className="font-semibold text-emerald-800">Close matches ({stats.close_matches})</h3>
+          <p className="mt-1 text-sm text-slate-500">Jobs scoring 75% or higher</p>
         </Link>
         <Link
-          to="/jobs?saved=true"
-          className="rounded-xl border border-sky-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+          to="/jobs?match=good"
+          className="rounded-xl border border-amber-200 bg-white p-6 shadow-sm transition hover:shadow-md"
         >
-          <h3 className="font-semibold text-sky-800">View saved jobs</h3>
-          <p className="mt-1 text-sm text-slate-500">Jobs you've bookmarked</p>
+          <h3 className="font-semibold text-amber-800">Good matches ({stats.good_matches})</h3>
+          <p className="mt-1 text-sm text-slate-500">Jobs scoring 55–74%</p>
         </Link>
       </div>
+
+      {topJobs.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Top matches for you</h3>
+            <Link to="/jobs" className="text-sm font-medium text-brand-600 hover:underline">
+              View all →
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {topJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onUpdate={async (jobId, data) => {
+                  await api.updateJobStatus(jobId, data);
+                  await load();
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
