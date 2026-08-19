@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     rapidapi_key: str = ""
 
     default_location: str = "Bangalore"
-    max_users: int = 2
+    max_users: int = 3
     min_job_score: float = 40.0
 
     openai_api_key: str = ""

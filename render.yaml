@@ -13,7 +13,7 @@ services:
       - key: DEFAULT_LOCATION
         value: Bangalore
       - key: MAX_USERS
-        value: "2"
+        value: "3"
       - key: RUN_SEED
         value: "1"
       - key: DATABASE_URL
