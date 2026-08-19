@@ -50,7 +50,7 @@ async def enrich_resume_with_llm(raw_text: str) -> Optional[dict]:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
