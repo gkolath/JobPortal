@@ -32,6 +32,12 @@ services:
         value: "true"
       - key: APIFY_MAX_ITEMS
         value: "25"
+      - key: APIFY_INDEED_ENABLED
+        value: "true"
+      - key: REMOTIVE_ENABLED
+        value: "true"
+      - key: ARBEITNOW_ENABLED
+        value: "true"
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL

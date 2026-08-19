@@ -6,12 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from job_fetcher import (
-    build_search_keywords,
-    fetch_adzuna_jobs,
-    fetch_apify_linkedin_jobs,
-    fetch_jsearch_jobs,
-)
+from job_fetcher import build_search_keywords, fetch_all_job_sources
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from config import settings
 from llm import openai_enabled, score_job_with_llm
@@ -177,15 +172,8 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     # Wipe stale listings from the previous resume before fetching
     clear_all_jobs(db)
 
-    all_fetched = []
-    cities = [loc["city"] for loc in locations]
-    for loc in locations:
-        adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
-        jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
-        all_fetched.extend(adzuna + jsearch)
-
-    apify_jobs = await fetch_apify_linkedin_jobs(titles, keywords, cities)
-    all_fetched.extend(apify_jobs)
+    all_fetched = await fetch_all_job_sources(titles, keywords, locations)
+    logger.info("Fetched %s raw jobs for user %s", len(all_fetched), user.id)
 
     seen = set()
     unique = []
@@ -229,15 +217,7 @@ async def refresh_all_jobs(db: Session) -> tuple:
             profile.locations_json, profile.location, profile.country
         )
         logger.info("Job search keywords for user %s: %s", user.id, keywords)
-
-        cities = [loc["city"] for loc in locations]
-        for loc in locations:
-            adzuna = await fetch_adzuna_jobs(keywords, loc["city"], loc["country"])
-            jsearch = await fetch_jsearch_jobs(keywords, loc["city"])
-            all_fetched.extend(adzuna + jsearch)
-
-        apify_jobs = await fetch_apify_linkedin_jobs(titles, keywords, cities)
-        all_fetched.extend(apify_jobs)
+        all_fetched.extend(await fetch_all_job_sources(titles, keywords, locations))
 
     seen = set()
     unique = []

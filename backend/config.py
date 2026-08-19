@@ -17,13 +17,22 @@ class Settings(BaseSettings):
 
     rapidapi_key: str = ""
 
-    # Apify LinkedIn job scrape (optional — adds many more listings)
+    # Apify LinkedIn + Indeed scrapes (optional)
     apify_token: str = ""
     apify_enabled: bool = True
     apify_job_actor: str = "harvestapi/linkedin-job-search"
     apify_max_items: int = 25  # per title × location; ~$0.001/job
     apify_posted_limit: str = "Past Month"
     apify_timeout_secs: int = 300
+    apify_indeed_enabled: bool = True
+    apify_indeed_actor: str = "misceres/indeed-scraper"
+    apify_indeed_max_items: int = 25
+    apify_indeed_max_cities: int = 5
+
+    # Free public boards (no API key)
+    remotive_enabled: bool = True
+    arbeitnow_enabled: bool = True
+    arbeitnow_max_pages: int = 3
 
     default_location: str = "Bangalore"
     max_users: int = 3

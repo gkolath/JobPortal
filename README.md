@@ -6,7 +6,7 @@ A shared web app for you and a friend to upload resumes, fetch jobs from externa
 
 - JWT auth (max 3 users)
 - Resume upload (PDF/DOCX) with skill/title extraction
-- Job fetch from Adzuna (+ optional JSearch + Apify LinkedIn)
+- Job fetch from Adzuna, Remotive, Arbeitnow (+ optional JSearch, Apify LinkedIn & Indeed)
 - Multi-city search: Dubai, Kochi, Bangalore, Abu Dhabi, Singapore
 - Match scoring: Close (≥75%), Good (55–74%), Weak (<55%)
 - Optional OpenAI: smarter parsing, AI match scores + fit reasons, cover letters, skill-gap analysis
@@ -55,9 +55,12 @@ Default logins (change after first use):
 | `ADZUNA_APP_KEY` | Adzuna API key |
 | `ADZUNA_COUNTRY` | Default country code (default: `in`) |
 | `RAPIDAPI_KEY` | Optional JSearch fallback |
-| `APIFY_TOKEN` | Apify API token for LinkedIn job scrape ([create one](https://console.apify.com/settings/integrations)) |
-| `APIFY_ENABLED` | Set `false` to disable Apify scrape |
+| `APIFY_TOKEN` | Apify API token for LinkedIn + Indeed scrapes ([create one](https://console.apify.com/settings/integrations)) |
+| `APIFY_ENABLED` | Set `false` to disable all Apify scrapes |
 | `APIFY_MAX_ITEMS` | Max LinkedIn jobs per title×location (default `25`) |
+| `APIFY_INDEED_ENABLED` | Set `false` to skip Indeed scrape |
+| `REMOTIVE_ENABLED` | Free Remotive remote jobs (default `true`) |
+| `ARBEITNOW_ENABLED` | Free Arbeitnow ATS jobs (default `true`) |
 | `OPENAI_API_KEY` | Enables AI resume enrich, match scoring + fit reasons, cover letters, gaps |
 | `OPENAI_MODEL` | Model id (default `gpt-4o-mini`) |
 | `OPENAI_MAX_SCORE_JOBS` | Max jobs to LLM-score per user per refresh (default `40`) |
