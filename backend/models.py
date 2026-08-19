@@ -77,6 +77,7 @@ class JobMatch(Base):
     job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id"))
     score: Mapped[float] = mapped_column(Float, default=0.0)
     label: Mapped[str] = mapped_column(String(20), default="weak")
+    fit_reason: Mapped[str] = mapped_column(Text, default="")
     saved: Mapped[bool] = mapped_column(Boolean, default=False)
     applied: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str] = mapped_column(Text, default="")

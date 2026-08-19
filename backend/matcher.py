@@ -109,6 +109,14 @@ def _job_is_irrelevant(job_title: str, description: str) -> bool:
     return any(m in hay for m in IRRELEVANT_MARKERS)
 
 
+def label_from_score(score: float) -> str:
+    if score >= 75:
+        return "close"
+    if score >= 55:
+        return "good"
+    return "weak"
+
+
 def compute_score(
     resume_skills: List[str],
     resume_titles: List[str],
@@ -136,11 +144,4 @@ def compute_score(
         score *= 0.2
 
     score = round(score, 1)
-
-    if score >= 75:
-        label = "close"
-    elif score >= 55:
-        label = "good"
-    else:
-        label = "weak"
-    return score, label
+    return score, label_from_score(score)

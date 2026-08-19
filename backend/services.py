@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -13,7 +14,8 @@ from job_fetcher import (
 )
 from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from config import settings
-from matcher import compute_score
+from llm import openai_enabled, score_job_with_llm
+from matcher import compute_score, label_from_score
 from models import Job, JobMatch, Resume, SearchProfile, User
 from search_query import filter_skills
 
@@ -58,7 +60,16 @@ def upsert_job(db: Session, data: dict) -> Job:
     return job
 
 
-def match_jobs_for_user(db: Session, user: User) -> int:
+def _resume_summary(resume: Resume, skills: List[str], titles: List[str]) -> str:
+    return (
+        f"Titles: {', '.join(titles)}\n"
+        f"Skills: {', '.join(skills)}\n"
+        f"Years experience: {resume.years_experience}\n"
+        f"Resume excerpt:\n{(resume.raw_text or '')[:3000]}"
+    )
+
+
+async def match_jobs_for_user(db: Session, user: User) -> int:
     resume = db.query(Resume).filter(Resume.user_id == user.id).first()
     if not resume:
         return 0
@@ -66,14 +77,15 @@ def match_jobs_for_user(db: Session, user: User) -> int:
     skills = filter_skills(json.loads(resume.skills_json or "[]"))
     titles = json.loads(resume.titles_json or "[]")
     jobs = db.query(Job).all()
-    count = 0
+    summary = _resume_summary(resume, skills, titles)
 
+    # Heuristic pass first
+    candidates: List[tuple] = []  # (job, heuristic_score, label)
     for job in jobs:
         score, label = compute_score(
             skills, titles, resume.years_experience, job.title, job.description
         )
         if score < settings.min_job_score and label == "weak":
-            # Drop very weak matches so the board stays relevant
             existing = (
                 db.query(JobMatch)
                 .filter(JobMatch.user_id == user.id, JobMatch.job_id == job.id)
@@ -82,6 +94,39 @@ def match_jobs_for_user(db: Session, user: User) -> int:
             if existing and not existing.saved and not existing.applied:
                 db.delete(existing)
             continue
+        candidates.append((job, score, label))
+
+    # LLM re-score top candidates (by heuristic), capped
+    llm_results: dict = {}  # job_id -> (score, reason)
+    if openai_enabled() and candidates:
+        ranked = sorted(candidates, key=lambda x: x[1], reverse=True)
+        to_score = [
+            (job, h_score)
+            for job, h_score, _ in ranked
+            if h_score >= settings.min_job_score
+        ][: settings.openai_max_score_jobs]
+
+        sem = asyncio.Semaphore(max(1, settings.openai_score_concurrency))
+
+        async def _score_one(job: Job, h_score: float):
+            async with sem:
+                result = await score_job_with_llm(summary, job.title, job.description or "")
+                if result:
+                    llm_results[job.id] = result
+
+        await asyncio.gather(*[_score_one(job, h) for job, h in to_score])
+
+    count = 0
+    for job, h_score, h_label in candidates:
+        fit_reason = ""
+        score = h_score
+        if job.id in llm_results:
+            llm_score, fit_reason = llm_results[job.id]
+            score = round(0.35 * h_score + 0.65 * llm_score, 1)
+            label = label_from_score(score)
+        else:
+            label = h_label
+
         match = (
             db.query(JobMatch)
             .filter(JobMatch.user_id == user.id, JobMatch.job_id == job.id)
@@ -90,10 +135,15 @@ def match_jobs_for_user(db: Session, user: User) -> int:
         if match:
             match.score = score
             match.label = label
+            match.fit_reason = fit_reason
             match.updated_at = datetime.utcnow()
         else:
             match = JobMatch(
-                user_id=user.id, job_id=job.id, score=score, label=label
+                user_id=user.id,
+                job_id=job.id,
+                score=score,
+                label=label,
+                fit_reason=fit_reason,
             )
             db.add(match)
         count += 1
@@ -139,7 +189,7 @@ async def refresh_jobs_for_user(db: Session, user: User) -> tuple:
     for data in unique:
         upsert_job(db, data)
 
-    matched = match_jobs_for_user(db, user)
+    matched = await match_jobs_for_user(db, user)
     return len(unique), matched
 
 
@@ -189,6 +239,6 @@ async def refresh_all_jobs(db: Session) -> tuple:
 
     match_count = 0
     for user in users:
-        match_count += match_jobs_for_user(db, user)
+        match_count += await match_jobs_for_user(db, user)
 
     return len(unique), match_count

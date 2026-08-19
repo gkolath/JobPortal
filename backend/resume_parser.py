@@ -174,7 +174,11 @@ async def parse_resume_async(path: Path) -> Tuple[str, List[str], List[str], int
     if enriched:
         if enriched.get("skills"):
             skills = sorted(set(skills + enriched["skills"]))
-        if enriched.get("titles"):
+        # Prefer LinkedIn-friendly titles when present (also used for Apify search)
+        linkedin = enriched.get("linkedin_titles") or []
+        if linkedin:
+            titles = linkedin[:5]
+        elif enriched.get("titles"):
             titles = enriched["titles"][:5]
         if enriched.get("years_experience"):
             years = max(years, enriched["years_experience"])

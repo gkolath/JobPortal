@@ -54,3 +54,11 @@ def _migrate():
                 conn.execute(
                     text("ALTER TABLE resumes ADD COLUMN search_query VARCHAR(500) DEFAULT ''")
                 )
+
+    if "jobs_matches" in inspector.get_table_names():
+        match_cols = {c["name"] for c in inspector.get_columns("jobs_matches")}
+        if "fit_reason" not in match_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE jobs_matches ADD COLUMN fit_reason TEXT DEFAULT ''")
+                )

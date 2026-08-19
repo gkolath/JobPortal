@@ -17,7 +17,9 @@ from locations import DEFAULT_LOCATIONS_JSON, parse_locations
 from models import Job, JobMatch, Resume, SearchProfile, User
 from resume_parser import parse_resume_async, to_json_list
 from schemas import (
+    CoverLetterOut,
     DashboardStats,
+    GapAnalysisOut,
     JobOut,
     JobStatusUpdate,
     LoginRequest,
@@ -30,6 +32,8 @@ from schemas import (
     TokenResponse,
     UserOut,
 )
+from llm import analyze_skill_gaps_llm, draft_cover_letter, openai_enabled
+from search_query import filter_skills
 from services import match_jobs_for_user, refresh_all_jobs
 
 
@@ -153,7 +157,7 @@ async def upload_resume(
     db.commit()
     db.refresh(resume)
 
-    match_jobs_for_user(db, user)
+    await match_jobs_for_user(db, user)
 
     return ResumeOut(
         file_name=resume.file_name,
@@ -272,12 +276,121 @@ def list_jobs(
                 posted_at=job.posted_at,
                 score=jm.score,
                 label=jm.label,
+                fit_reason=getattr(jm, "fit_reason", "") or "",
                 saved=jm.saved,
                 applied=jm.applied,
                 notes=jm.notes,
             )
         )
     return results
+
+
+@app.post("/api/jobs/{job_id}/cover-letter", response_model=CoverLetterOut)
+async def generate_cover_letter(
+    job_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not openai_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI is not configured. Set OPENAI_API_KEY to enable cover letters.",
+        )
+    resume = db.query(Resume).filter(Resume.user_id == user.id).first()
+    if not resume:
+        raise HTTPException(status_code=404, detail="Upload a resume first")
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    match = (
+        db.query(JobMatch)
+        .filter(JobMatch.job_id == job_id, JobMatch.user_id == user.id)
+        .first()
+    )
+    if not match:
+        raise HTTPException(status_code=404, detail="Job match not found")
+
+    skills = filter_skills(json.loads(resume.skills_json or "[]"))
+    titles = json.loads(resume.titles_json or "[]")
+    summary = (
+        f"Titles: {', '.join(titles)}\n"
+        f"Skills: {', '.join(skills)}\n"
+        f"Years: {resume.years_experience}\n"
+        f"{(resume.raw_text or '')[:4000]}"
+    )
+    text = await draft_cover_letter(
+        user.name, summary, job.title, job.company or "", job.description or ""
+    )
+    if not text:
+        raise HTTPException(status_code=502, detail="Could not generate cover letter")
+    return CoverLetterOut(text=text)
+
+
+@app.get("/api/profile/gaps", response_model=GapAnalysisOut)
+async def profile_gaps(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    resume = db.query(Resume).filter(Resume.user_id == user.id).first()
+    if not resume:
+        raise HTTPException(status_code=404, detail="Upload a resume first")
+
+    skills = filter_skills(json.loads(resume.skills_json or "[]"))
+    titles = json.loads(resume.titles_json or "[]")
+    rows = (
+        db.query(JobMatch, Job)
+        .join(Job, JobMatch.job_id == Job.id)
+        .filter(JobMatch.user_id == user.id, JobMatch.label.in_(["close", "good"]))
+        .order_by(JobMatch.score.desc())
+        .limit(15)
+        .all()
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=400,
+            detail="No close/good matches yet. Refresh jobs first, then analyze gaps.",
+        )
+
+    snippets = [
+        {
+            "title": job.title,
+            "company": job.company,
+            "description": (job.description or "")[:800],
+        }
+        for _, job in rows
+    ]
+
+    if openai_enabled():
+        result = await analyze_skill_gaps_llm(skills, titles, snippets)
+        if result:
+            return GapAnalysisOut(
+                missing_skills=result["missing_skills"],
+                suggested_skills=result["suggested_skills"],
+                notes=result["notes"],
+                based_on_jobs=len(rows),
+            )
+
+    # Heuristic fallback: tokens frequent in job text but not in resume skills
+    import re
+    from collections import Counter
+
+    skill_set = {s.lower() for s in skills}
+    words: Counter = Counter()
+    for _, job in rows:
+        tokens = re.findall(r"[a-z][a-z+#.]{2,}", f"{job.title} {job.description}".lower())
+        for t in tokens:
+            if t not in skill_set and t not in {
+                "the", "and", "with", "for", "our", "you", "will", "are", "this",
+                "that", "from", "have", "your", "team", "role", "work", "job",
+            }:
+                words[t] += 1
+    missing = [w for w, _ in words.most_common(15)]
+    return GapAnalysisOut(
+        missing_skills=missing[:10],
+        suggested_skills=missing[:8],
+        notes=(
+            "Heuristic gap estimate from top matched jobs "
+            "(enable OPENAI_API_KEY for richer analysis)."
+        ),
+        based_on_jobs=len(rows),
+    )
 
 
 @app.patch("/api/jobs/{job_id}/status")

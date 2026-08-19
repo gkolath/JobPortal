@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import ResumeUpload from "../components/ResumeUpload";
-import { api, Resume, SearchProfile } from "../lib/api";
+import { api, GapAnalysis, Resume, SearchProfile } from "../lib/api";
 
 export default function ProfilePage() {
   const [resume, setResume] = useState<Resume | null>(null);
@@ -18,6 +18,8 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [gaps, setGaps] = useState<GapAnalysis | null>(null);
+  const [gapsLoading, setGapsLoading] = useState(false);
 
   useEffect(() => {
     api.getResume().then(setResume).catch(() => setResume(null));
@@ -53,6 +55,19 @@ export default function ProfilePage() {
       setMessage(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGaps = async () => {
+    setGapsLoading(true);
+    setMessage("");
+    try {
+      const result = await api.gapAnalysis();
+      setGaps(result);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Gap analysis failed");
+    } finally {
+      setGapsLoading(false);
     }
   };
 
@@ -117,6 +132,65 @@ export default function ProfilePage() {
           </div>
         </section>
       )}
+
+      <section>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">Skill gaps</h3>
+            <p className="text-sm text-slate-500">
+              Compare your resume to your top matched roles
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleGaps}
+            disabled={gapsLoading || !resume}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {gapsLoading ? "Analyzing…" : "Analyze gaps"}
+          </button>
+        </div>
+        {gaps && (
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+            <p className="text-sm text-slate-600">{gaps.notes}</p>
+            <p className="text-xs text-slate-400">Based on {gaps.based_on_jobs} matched jobs</p>
+            <div>
+              <h4 className="text-sm font-semibold text-slate-800">Missing skills</h4>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {gaps.missing_skills.length ? (
+                  gaps.missing_skills.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
+                    >
+                      {s}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-400">None flagged</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-slate-800">Suggested next skills</h4>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {gaps.suggested_skills.length ? (
+                  gaps.suggested_skills.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800"
+                    >
+                      {s}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-400">None suggested</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section>
         <h3 className="mb-4 text-lg font-semibold">Search preferences</h3>

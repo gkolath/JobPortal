@@ -17,9 +17,17 @@ export interface Job {
   posted_at: string | null;
   score: number;
   label: "close" | "good" | "weak";
+  fit_reason?: string;
   saved: boolean;
   applied: boolean;
   notes: string;
+}
+
+export interface GapAnalysis {
+  missing_skills: string[];
+  suggested_skills: string[];
+  notes: string;
+  based_on_jobs: number;
 }
 
 export interface DashboardStats {
@@ -82,10 +90,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    if (res.status === 404 || res.status === 502 || res.status === 503) {
+    const detailMsg = formatErrorDetail(err.detail, "");
+    // Render cold-start: empty/generic errors only
+    if ((res.status === 502 || res.status === 503) && !detailMsg) {
       throw new Error("Server is waking up — wait 30 seconds and try again");
     }
-    throw new Error(formatErrorDetail(err.detail, res.statusText || "Request failed"));
+    if (res.status === 404 && !detailMsg) {
+      throw new Error("Server is waking up — wait 30 seconds and try again");
+    }
+    throw new Error(detailMsg || res.statusText || "Request failed");
   }
   if (res.status === 204) return {} as T;
   return res.json();
@@ -128,11 +141,22 @@ export const api = {
   refreshJobs: () =>
     request<{ jobs_fetched: number; matches_updated: number }>("/jobs/refresh", {
       method: "POST",
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(180000),
     }),
 
   updateJobStatus: (jobId: number, data: { saved?: boolean; applied?: boolean; notes?: string }) =>
     request(`/jobs/${jobId}/status`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  coverLetter: (jobId: number) =>
+    request<{ text: string }>(`/jobs/${jobId}/cover-letter`, {
+      method: "POST",
+      signal: AbortSignal.timeout(90000),
+    }),
+
+  gapAnalysis: () =>
+    request<GapAnalysis>("/profile/gaps", {
+      signal: AbortSignal.timeout(90000),
+    }),
 
   uploadResume: (file: File) => {
     const form = new FormData();

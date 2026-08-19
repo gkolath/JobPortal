@@ -75,6 +75,7 @@ class JobOut(BaseModel):
     posted_at: Optional[datetime]
     score: float
     label: str
+    fit_reason: str = ""
     saved: bool
     applied: bool
     notes: str
@@ -87,6 +88,17 @@ class JobStatusUpdate(BaseModel):
     saved: Optional[bool] = None
     applied: Optional[bool] = None
     notes: Optional[str] = None
+
+
+class CoverLetterOut(BaseModel):
+    text: str
+
+
+class GapAnalysisOut(BaseModel):
+    missing_skills: List[str]
+    suggested_skills: List[str]
+    notes: str
+    based_on_jobs: int
 
 
 class DashboardStats(BaseModel):

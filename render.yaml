@@ -36,6 +36,8 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4o-mini
+      - key: OPENAI_MAX_SCORE_JOBS
+        value: "40"
       - key: MIN_JOB_SCORE
         value: "40"
 

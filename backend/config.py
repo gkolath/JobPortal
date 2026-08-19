@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    openai_max_score_jobs: int = 40
+    openai_score_concurrency: int = 5
 
     uploads_dir: Path = ROOT_DIR / "uploads"
     static_dir: Path = ROOT_DIR / "frontend" / "dist"

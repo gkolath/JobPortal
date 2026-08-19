@@ -9,6 +9,7 @@ A shared web app for you and a friend to upload resumes, fetch jobs from externa
 - Job fetch from Adzuna (+ optional JSearch + Apify LinkedIn)
 - Multi-city search: Dubai, Kochi, Bangalore, Abu Dhabi, Singapore
 - Match scoring: Close (≥75%), Good (55–74%), Weak (<55%)
+- Optional OpenAI: smarter parsing, AI match scores + fit reasons, cover letters, skill-gap analysis
 - Dashboard, job board with filters, save/applied tracking
 - Toggle between your matches and your friend's matches
 
@@ -57,6 +58,9 @@ Default logins (change after first use):
 | `APIFY_TOKEN` | Apify API token for LinkedIn job scrape ([create one](https://console.apify.com/settings/integrations)) |
 | `APIFY_ENABLED` | Set `false` to disable Apify scrape |
 | `APIFY_MAX_ITEMS` | Max LinkedIn jobs per title×location (default `25`) |
+| `OPENAI_API_KEY` | Enables AI resume enrich, match scoring + fit reasons, cover letters, gaps |
+| `OPENAI_MODEL` | Model id (default `gpt-4o-mini`) |
+| `OPENAI_MAX_SCORE_JOBS` | Max jobs to LLM-score per user per refresh (default `40`) |
 | `DEFAULT_LOCATION` | Default city (default: `Bangalore`) |
 | `RUN_SEED` | Set to `1` on first Render deploy to seed users |
 
